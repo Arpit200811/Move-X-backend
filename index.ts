@@ -76,22 +76,23 @@ app.use('/uploads', express.static('uploads'));
 // Global API Limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 2000, // Increased for testing
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Rate limit exceeded. Try again later.' }
 });
 
-// Stricter Limiter for Auth Routes (Prevention of Brute Force)
+// Stricter Limiter for Auth Routes
 const authLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // 10 attempts
-    message: { success: false, message: 'Too many login attempts. Please try again after an hour.' }
+    windowMs: 15 * 60 * 1000, 
+    max: 100, // Increased from 10 to 100 for testing
+    message: { success: false, message: 'Too many login attempts. Please try again after 15 minutes.' }
 });
 
 app.use('/api/', limiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/driver-apply', authLimiter);
+app.use('/api/auth/verify-otp', authLimiter);
 
 // ── HTTPS Enforcement (Production) ──────────────────────────────────
 if (process.env.NODE_ENV === 'production' && process.env.FORCE_HTTPS === 'true') {
