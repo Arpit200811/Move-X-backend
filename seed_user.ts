@@ -11,7 +11,7 @@ async function seedPartner() {
         const userRepo = AppDataSource.getRepository(User);
         const partnerRepo = AppDataSource.getRepository(Partner);
 
-        const phone = '6387200811';
+        const phone = '6386373577';
         const name = 'Admin Partner';
         const password = 'partner123';
 

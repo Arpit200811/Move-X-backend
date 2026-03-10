@@ -62,6 +62,27 @@ export class Partner {
     @JoinColumn({ name: 'ownerId' })
     owner: User;
 
+    @Column({ nullable: true })
+    address: string;
+
+    @Column({ nullable: true })
+    gstNumber: string;
+
+    @Column({ type: 'float', default: 5.0 })
+    gstRate: number;
+
+    @Column({ type: 'simple-json', nullable: true })
+    surgeRules: any;
+
+    @Column({ nullable: true })
+    boostTier: string;
+
+    @Column({ type: 'float', nullable: true })
+    boostMultiplier: number;
+
+    @Column({ type: 'timestamp', nullable: true })
+    boostExpiresAt: Date;
+
     @OneToMany(() => Product, product => product.vendor)
     products: Product[];
 }

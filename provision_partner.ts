@@ -7,7 +7,7 @@ async function provisionPartner() {
     const userRepository = AppDataSource.getRepository(User);
     const partnerRepository = AppDataSource.getRepository(Partner);
     
-    const user = await userRepository.findOne({ where: { phone: '6387200811' } });
+    const user = await userRepository.findOne({ where: { phone: '6386373577' } });
     
     if (user) {
         if (user.role !== 'partner') {
@@ -36,7 +36,7 @@ async function provisionPartner() {
             console.log(JSON.stringify(existingPartner, null, 2));
         }
     } else {
-        console.log('User 6387200811 not found.');
+        console.log('User 6386373577 not found.');
     }
     
     await AppDataSource.destroy();

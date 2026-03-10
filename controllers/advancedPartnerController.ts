@@ -76,7 +76,7 @@ export const getLowStockAlerts = async (req: AuthenticatedRequest, res: Response
         const productRepo = AppDataSource.getRepository(Product);
         const partner = await getPartnerByUser(req.user!.id);
         if (!partner) return res.status(404).json({ success: false, message: 'Partner not found' });
-        const products = await productRepo.find({ where: { partner: { _id: partner._id } } });
+        const products = await productRepo.find({ where: { vendor: { _id: partner._id } } });
         const alerts = products.filter((p: any) => 
             p.stockQuantity !== undefined && p.stockQuantity <= (p.lowStockThreshold || 5)
         );
@@ -180,10 +180,10 @@ export const addStaffAccount = async (req: AuthenticatedRequest, res: Response) 
         if (exists) return res.status(400).json({ success: false, message: 'Phone already registered' });
         const passwordHash = await bcrypt.hash(password || 'staff123', 10);
         const staff = userRepo.create({
-            name, phone, role: 'partner_staff' as any, passwordHash,
+            name, phone, role: 'partner_staff', passwordHash,
             status: 'active', isOnline: false,
-            staffPartnerId: partner._id as any
-        });
+            staffPartnerId: partner._id
+        } as any);
         await userRepo.save(staff);
         res.status(201).json({ success: true, staff: { ...staff, passwordHash: undefined } });
     } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }

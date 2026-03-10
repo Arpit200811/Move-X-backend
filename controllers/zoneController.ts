@@ -50,9 +50,9 @@ export const updateTaxConfig = async (req: Request, res: Response) => {
         const { countryCode, taxRate } = req.body;
         let config = await repo.findOne({ where: { countryCode } });
         if (config) {
-            config.taxRate = taxRate;
+            repo.merge(config, req.body);
         } else {
-            config = repo.create(req.body);
+            config = repo.create(req.body) as any;
         }
         if (config) {
             await repo.save(config);

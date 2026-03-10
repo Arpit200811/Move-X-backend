@@ -93,6 +93,9 @@ export class User {
         holderName?: string;
     };
 
+    @Column({ nullable: true })
+    staffPartnerId: string;
+
     @Column({ default: 'INR' })
     currency: string;
 

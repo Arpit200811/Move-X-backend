@@ -29,8 +29,8 @@ export const calculateSurgeMultiplier = async (pickupLat: any, pickupLng: any): 
 
         // 2. Zone-based Base Multiplier
         const zone = await GeoFencingService.getZoneAtLocation(Number(pickupLat), Number(pickupLng));
-        if (zone && zone.baseMultipler > 1.0) {
-            multiplier *= zone.baseMultipler;
+        if (zone && (zone as any).baseMultiplier > 1.0) {
+            multiplier *= (zone as any).baseMultiplier;
             reasons.push(`ZONE_PREMIUM_${zone.name.toUpperCase()}`);
         }
 
