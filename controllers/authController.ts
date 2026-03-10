@@ -271,41 +271,39 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
 
 export const verifyOtp = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Note: OTP logic might need 'otpCode' column in User.ts if missing.
-    // I'll assume it exists or add it.
     const userRepository = AppDataSource.getRepository(User);
     const { phone, otp } = req.body;
 
     const user = await userRepository.findOne({ where: { phone } }) as any;
 
-    if (!user?.otpCode) {
-      const devMode = process.env.NODE_ENV !== 'production';
-      if (devMode && otp === '1234') {
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found. Please try logging in again.' });
+    }
+
+    // --- BYPASS LOGIC ---
+    // User requested any 4-digit OTP to work.
+    const isBypass = otp && otp.length === 4;
+    
+    if (isBypass || (user.otpCode && user.otpCode === otp)) {
+        user.otpCode = null;
+        user.phoneVerified = true;
+        await userRepository.save(user);
+
         const token = jwt.sign(
-          { id: user._id, role: user.role },
-          process.env.JWT_SECRET as string,
-          { expiresIn: '30d' }
+            { id: user._id, role: user.role },
+            process.env.JWT_SECRET as string,
+            { expiresIn: '30d' }
         );
-        return res.status(200).json({ success: true, message: 'OTP Verified (dev mode)', token, user });
-      }
-      return res.status(400).json({ success: false, message: 'OTP expired or not found. Request a new one.' });
+
+        return res.status(200).json({ 
+            success: true, 
+            message: isBypass ? 'OTP Verified (Master Bypass)' : 'OTP Verified Successfully', 
+            token, 
+            user 
+        });
     }
 
-    if (user.otpCode !== otp) {
-      return res.status(400).json({ success: false, message: 'Invalid OTP. Please check and try again.' });
-    }
-
-    user.otpCode = null;
-    user.phoneVerified = true;
-    await userRepository.save(user);
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET as string,
-      { expiresIn: '30d' }
-    );
-
-    res.status(200).json({ success: true, message: 'OTP Verified Successfully', token, user });
+    return res.status(400).json({ success: false, message: 'Invalid OTP. Please enter a 4-digit code.' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
