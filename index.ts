@@ -54,7 +54,18 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // ── Core Middleware ──────────────────────────────────────────────────
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['*'];
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors({ 
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.indexOf('*') !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(helmet());
 app.use(compression());
