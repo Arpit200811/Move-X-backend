@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { MoreThan } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import { User } from '../models/User';
 import { Order } from '../models/Order';
@@ -95,6 +96,8 @@ export const updateLocationBatch = async (req: AuthenticatedRequest, res: Respon
             driver.lastLocationTimestamp = pointTime;
         }
 
+        driver.isOnline = true;
+        driver.status = 'available';
         await userRepository.save(driver);
         req.io.emit('driver_location_updated', { driverId: driver._id, lat: driver.lat, lng: driver.lng });
         res.status(200).json({ success: true, count: batch.length });
@@ -156,7 +159,7 @@ export const getDriverStats = async (req: AuthenticatedRequest, res: Response) =
                 monthly: { earnings: monthEarnings, trips: monthOrders.length },
                 lifetime: { earnings: totalEarnings, trips: orders.length },
                 performance: {
-                    rating: driver.rating || 5.0,
+                    rating: Number(driver.rating || 5.0),
                     acceptanceRate: Math.round(acceptanceRate),
                     loyaltyPoints: tierPoints
                 },
@@ -216,6 +219,72 @@ export const acceptVRPBatch = async (req: AuthenticatedRequest, res: Response) =
         const driverId = req.user?.id as string;
         const orders = await VRPService.deployBatch(driverId, orderIds, req.io);
         res.status(200).json({ success: true, orders });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+export const getDriverFeedbacks = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const userId = req.user?.id as string;
+        const orderRepo = AppDataSource.getRepository(Order);
+        
+        const reviewedOrders = await orderRepo.find({
+            where: { 
+                driverId: { _id: userId } as any,
+                rating: MoreThan(0)
+            },
+            take: 20,
+            order: { createdAt: 'DESC' }
+        });
+
+        const feedbacks = reviewedOrders.map(o => ({
+            id: o._id,
+            rating: o.rating,
+            comment: o.review || "No comment provided",
+            date: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : "Unknown",
+            label: o.rating && o.rating >= 4 ? "POSITIVE" : "NEUTRAL"
+        }));
+
+        res.status(200).json({ success: true, feedbacks });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+export const getDriverIncentives = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const userId = req.user?.id as string;
+        const orderRepo = AppDataSource.getRepository(Order);
+        
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        const todayTrips = await orderRepo.count({
+            where: { 
+                driverId: { _id: userId } as any, 
+                status: 'DELIVERED',
+                createdAt: MoreThan(startOfToday)
+            }
+        });
+
+        // Current goal: 12 deliveries for $20 bonus
+        const dailyGoal = 12;
+        const progress = Math.min((todayTrips / dailyGoal) * 100, 100);
+
+        res.status(200).json({
+            success: true,
+            incentives: {
+                daily: {
+                    trips: todayTrips,
+                    goal: dailyGoal,
+                    progress,
+                    bonus: 20
+                },
+                challenges: [
+                    { id: 'peak', title: "Peak Hour Hero", progress: 4, goal: 5, reward: 50, type: 'zap' },
+                    { id: 'safety', title: "Safety Star", progress: 25, goal: 25, reward: 100, type: 'shield' }
+                ]
+            }
+        });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message });
     }

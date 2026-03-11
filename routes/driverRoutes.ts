@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDrivers, updateLocation, getSurgeHeatmap, getDriverStats, getVRPBatches, acceptVRPBatch } from '../controllers/driverController';
+import { getDrivers, updateLocation, getSurgeHeatmap, getDriverStats, getVRPBatches, acceptVRPBatch, getDriverFeedbacks, getDriverIncentives } from '../controllers/driverController';
 import { auth, roleGuard } from '../config/authMiddleware';
 
 const router = express.Router();
@@ -11,5 +11,7 @@ router.post('/batch-accept', auth as any, roleGuard(['driver']), acceptVRPBatch)
 router.post('/location', auth as any, roleGuard(['driver', 'admin']), updateLocation);
 router.patch('/location', auth as any, roleGuard(['driver', 'admin']), updateLocation);
 router.get('/heatmap', auth as any, roleGuard(['driver', 'customer', 'admin']), getSurgeHeatmap);
+router.get('/feedbacks', auth as any, roleGuard(['driver']), getDriverFeedbacks);
+router.get('/incentives', auth as any, roleGuard(['driver']), getDriverIncentives);
 
 export default router;
