@@ -60,8 +60,8 @@ const calculateSurgeMultiplier = async (pickupLat, pickupLng) => {
         }
         // 2. Zone-based Base Multiplier
         const zone = await geoFencingService_1.GeoFencingService.getZoneAtLocation(Number(pickupLat), Number(pickupLng));
-        if (zone && zone.baseMultipler > 1.0) {
-            multiplier *= zone.baseMultipler;
+        if (zone && zone.baseMultiplier > 1.0) {
+            multiplier *= zone.baseMultiplier;
             reasons.push(`ZONE_PREMIUM_${zone.name.toUpperCase()}`);
         }
         // 3. H3 Real-time Demand/Supply

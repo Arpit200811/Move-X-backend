@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Coupon = void 0;
 const typeorm_1 = require("typeorm");
+const Partner_1 = require("./Partner");
 let Coupon = class Coupon {
     _id;
     code; // e.g. 'MOVEX50'
@@ -26,6 +27,7 @@ let Coupon = class Coupon {
     usageCount;
     usageLimit;
     createdAt;
+    vendor; // If null, it's a global platform coupon, else it's a vendor-specific coupon
 };
 exports.Coupon = Coupon;
 __decorate([
@@ -84,6 +86,11 @@ __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
 ], Coupon.prototype, "createdAt", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => Partner_1.Partner, { nullable: true, onDelete: 'CASCADE' }),
+    (0, typeorm_1.JoinColumn)({ name: 'vendorId' }),
+    __metadata("design:type", Partner_1.Partner)
+], Coupon.prototype, "vendor", void 0);
 exports.Coupon = Coupon = __decorate([
     (0, typeorm_1.Entity)('coupons')
 ], Coupon);

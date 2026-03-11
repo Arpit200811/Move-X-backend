@@ -30,6 +30,7 @@ import vendorRoutes from './routes/vendorRoutes';
 import marketingRoutes from './routes/marketingRoutes';
 import ticketRoutes from './routes/ticketRoutes';
 import zoneRoutes from './routes/zoneRoutes';
+import { checkServiceability } from './controllers/zoneController';
 import auditRoutes from './routes/auditRoutes';
 import bannerRoutes from './routes/bannerRoutes';
 import refundRoutes from './routes/refundRoutes';
@@ -140,16 +141,19 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// High-Priority Serviceability Check (Root Level)
+app.get('/api/serviceable-check', checkServiceability);
+
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'MoveX API Server is running (TypeScript Edition)' });
 });
 
 // ── API Routes ────────────────────────────────────────────────────────
+app.use('/api/zones', zoneRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/group-orders', groupOrderRoutes);
 app.use('/api/drivers', driverRoutes);
-app.use('/api', deliveryRoutes);
 app.use('/api/partners', partnerRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/stats', statsRoutes);
@@ -162,14 +166,13 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/marketing', marketingRoutes);
 app.use('/api/tickets', ticketRoutes);
-app.use('/api/zones', zoneRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/refunds', refundRoutes);
-app.use('/api/zones', zoneRoutes);
 app.use('/api/fleet', fleetRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/surge', surgeRoutes);
+app.use('/api', deliveryRoutes);
 app.use('/api/partner-hub', advancedPartnerRoutes);
 
 // ── Global Error Handler ─────────────────────────────────────────────

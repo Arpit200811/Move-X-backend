@@ -103,11 +103,23 @@ const updatePartnerSettings = async (req, res) => {
         const partner = await partnerRepository.findOne({ where: { owner: { _id: req.user?.id } } });
         if (!partner)
             return res.status(404).json({ success: false, message: 'Partner node not found.' });
-        const { autoAccept, isAcceptingOrders } = req.body;
+        const { autoAccept, isAcceptingOrders, operatingHours, defaultPrepTime, industrySpecificData, name, image, deliveryTime } = req.body;
         if (autoAccept !== undefined)
             partner.autoAccept = autoAccept;
         if (isAcceptingOrders !== undefined)
             partner.isAcceptingOrders = isAcceptingOrders;
+        if (operatingHours !== undefined)
+            partner.operatingHours = operatingHours;
+        if (defaultPrepTime !== undefined)
+            partner.defaultPrepTime = parseInt(defaultPrepTime);
+        if (industrySpecificData !== undefined)
+            partner.industrySpecificData = industrySpecificData;
+        if (name !== undefined)
+            partner.name = name;
+        if (image !== undefined)
+            partner.image = image;
+        if (deliveryTime !== undefined)
+            partner.deliveryTime = deliveryTime;
         await partnerRepository.save(partner);
         res.status(200).json({ success: true, partner });
     }

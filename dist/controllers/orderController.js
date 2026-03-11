@@ -5,6 +5,7 @@ const data_source_1 = require("../data-source");
 const Order_1 = require("../models/Order");
 const User_1 = require("../models/User");
 const Partner_1 = require("../models/Partner");
+const Transaction_1 = require("../models/Transaction");
 const notificationService_1 = require("../services/notificationService");
 const dispatcherService_1 = require("../services/dispatcherService");
 const auditService_1 = require("../services/auditService");
@@ -246,34 +247,61 @@ const cancelOrder = async (req, res) => {
     try {
         const { orderId } = req.params;
         const orderRepository = data_source_1.AppDataSource.getRepository(Order_1.Order);
+        const userRepository = data_source_1.AppDataSource.getRepository(User_1.User);
+        console.log('📡 [CANCEL_ATTEMPT]', { orderId, userId: req.user?.id, role: req.user?.role });
         const order = await orderRepository.findOne({
             where: { _id: orderId },
-            relations: ['customerId']
+            relations: ['customerId', 'driverId']
         });
-        if (!order)
+        if (!order) {
+            console.log('❌ [CANCEL_FAILED] Order not found:', orderId);
             return res.status(404).json({ success: false, message: 'Order reference lost.' });
-        // Allowed to cancel only if not already picked up
+        }
+        console.log('📦 [ORDER_DETAILS]', { status: order.status, customerId: order.customerId?._id });
+        // 🔐 SECURITY CHECK: Only owner or admin can cancel
+        if (order.customerId?._id !== req.user?.id && req.user?.role !== 'admin') {
+            console.log('🚫 [CANCEL_DENIED] Unauthorized:', { owner: order.customerId?._id, requester: req.user?.id });
+            return res.status(403).json({ success: false, message: 'Unauthorized abortion attempt.' });
+        }
+        // Allowed to cancel only if not already delivered/picked up
         const restricted = ['PICKED_UP', 'DELIVERED', 'CANCELLED'];
         if (restricted.includes(order.status)) {
-            return res.status(400).json({ success: false, message: 'Order cannot be cancelled in current state.' });
+            return res.status(400).json({ success: false, message: `Mission cannot be aborted while in state: ${order.status}` });
         }
-        // 🟢 REFUND PROTOCOL: If paid via wallet, return funds
-        if (order.paymentStatus === 'paid' && order.paymentMethod === 'Wallet') {
-            const userRepository = data_source_1.AppDataSource.getRepository(User_1.User);
-            await userRepository.increment({ _id: order.customerId._id }, 'walletBalance', order.total);
-            auditService_1.AuditService.log('wallet', order.customerId._id, 'ORDER_CANCEL_REFUND', null, { amount: order.total, orderId: order._id });
+        // 🟢 REFUND PROTOCOL
+        if (order.paymentStatus === 'paid' && (order.paymentMethod === 'Wallet' || order.paymentMethod === 'Card') && order.customerId) {
+            await userRepository.increment({ _id: order.customerId._id }, 'walletBalance', order.total || 0);
+            await auditService_1.AuditService.log('wallet', order.customerId._id, 'ORDER_CANCEL_REFUND', null, { amount: order.total, orderId: order._id });
+            console.log('💰 [REFUND_ISSUED]', { userId: order.customerId._id, amount: order.total });
+        }
+        // 🔓 DRIVER RELEASE
+        if (order.driverId) {
+            const dId = order.driverId._id;
+            await userRepository.update(dId, { status: 'available' });
+            await auditService_1.AuditService.log('user', dId, 'MISSION_CANCELLED_BY_USER', null, { orderId: order._id });
+            (0, notificationService_1.sendNotification)(dId, 'Mission Cancelled', 'The customer has aborted the mission.', { orderId: order._id });
+            console.log('🔓 [DRIVER_RELEASED]', dId);
         }
         order.status = 'CANCELLED';
         if (!order.timeline)
             order.timeline = [];
-        order.timeline.push({ status: 'CANCELLED', timestamp: new Date(), reason: req.body.reason || 'User cancelled' });
+        order.timeline.push({
+            status: 'CANCELLED',
+            timestamp: new Date(),
+            reason: req.body?.reason || 'User cancelled',
+            cancelledBy: req.user?.id
+        });
         await orderRepository.save(order);
-        if (req.io)
+        if (req.io) {
             req.io.emit('order_updated', order);
-        res.status(200).json({ success: true, message: 'Mission Aborted.' });
+            req.io.to(order._id).emit('order_cancelled', { reason: 'User cancelled' });
+        }
+        console.log('✅ [CANCEL_SUCCESS]', order.orderId);
+        res.status(200).json({ success: true, message: 'Mission Aborted Successfully.' });
     }
     catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error('❌ [CANCEL_CRASH]:', error.message);
+        res.status(500).json({ success: false, message: 'Neural link failure: ' + error.message });
     }
 };
 exports.cancelOrder = cancelOrder;
@@ -437,7 +465,7 @@ const updateOrderStatus = async (req, res) => {
         order.timeline.push({ status, timestamp: new Date() });
         // ── FINANCIAL SETTLEMENT PROTOCOL ──────────────────────────────
         if (status === 'DELIVERED') {
-            const platformCommissionRate = 0.15; // 15% Platform Fee
+            const transactionRepository = data_source_1.AppDataSource.getRepository(Transaction_1.Transaction);
             const totalAmount = order.total || 0;
             const deliveryFee = order.deliveryFee || 0;
             // 1. Merchant Payout (if applicable)
@@ -447,15 +475,36 @@ const updateOrderStatus = async (req, res) => {
                 const merchantShare = itemsTotal * 0.90;
                 if (partner.owner) {
                     await userRepository.increment({ _id: partner.owner._id }, 'walletBalance', merchantShare);
+                    // CREATE TRANSACTION RECORD
+                    const merchantTx = transactionRepository.create({
+                        userId: partner.owner._id,
+                        orderId: order._id,
+                        type: 'EARNING',
+                        amount: merchantShare,
+                        status: 'COMPLETED',
+                        description: `Sale Revenue for Mission #${order.orderId || order._id.slice(-6)}`
+                    });
+                    await transactionRepository.save(merchantTx);
                     auditService_1.AuditService.log('wallet', partner.owner._id, 'MERCHANT_CREDIT', null, { amount: merchantShare, orderId: order._id });
                 }
             }
             // 2. Driver Payout
             if (order.driverId) {
                 const driverPay = deliveryFee * 0.90;
-                await userRepository.increment({ _id: order.driverId._id }, 'walletBalance', driverPay);
-                await userRepository.update(order.driverId._id, { status: 'available' }); // Back to pool
-                auditService_1.AuditService.log('wallet', order.driverId._id, 'DRIVER_EARNING', null, { amount: driverPay, orderId: order._id });
+                const driverId = order.driverId._id || order.driverId;
+                await userRepository.increment({ _id: driverId }, 'walletBalance', driverPay);
+                await userRepository.update(driverId, { status: 'available' }); // Back to pool
+                // CREATE TRANSACTION RECORD
+                const driverTx = transactionRepository.create({
+                    userId: driverId,
+                    orderId: order._id,
+                    type: 'EARNING',
+                    amount: driverPay,
+                    status: 'COMPLETED',
+                    description: `Pilot Commission for Mission #${order.orderId || order._id.slice(-6)}`
+                });
+                await transactionRepository.save(driverTx);
+                auditService_1.AuditService.log('wallet', driverId, 'DRIVER_EARNING', null, { amount: driverPay, orderId: order._id });
             }
             order.paymentStatus = 'paid';
         }

@@ -44,11 +44,22 @@ export class GeoFencingService {
      * Validates if the operation is possible between two points (pickup and destination).
      */
     static async validateServiceArea(pickup: { lat: number, lng: number }, destination: { lat: number, lng: number }) {
+        // Development Bypass: Allow testing from anywhere if not in production
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('⚡ [GEO-FENCE]: Dev-mode bypass active.');
+            return { pickupZone: null, destZone: null };
+        }
+
+        const zoneRepository = AppDataSource.getRepository(Zone);
+        const totalZones = await zoneRepository.count({ where: { isActive: true } });
+        
+        if (totalZones === 0) return { pickupZone: null, destZone: null };
+
         const pickupZone = await this.getZoneAtLocation(pickup.lat, pickup.lng);
         if (!pickupZone) throw new Error('SERVICE_NOT_AVAILABLE_IN_PICKUP_AREA');
 
         const destZone = await this.getZoneAtLocation(destination.lat, destination.lng);
-        if (!destZone) throw new Error('SERVICE_NOT_AVAILABLE_IN_DESTINATION_AREA');
+        if (!destZone) throw new Error('SERVICE_NOT_AVAILABLE_IN_THIS_AREA');
 
         return { pickupZone, destZone };
     }

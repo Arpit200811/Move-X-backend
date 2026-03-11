@@ -21,7 +21,7 @@ router.put('/:orderId/accept', authMiddleware_1.auth, (0, authMiddleware_1.roleG
 router.put('/:orderId/decline', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['driver', 'admin']), orderController_1.declineMission);
 router.put('/:orderId/merchant-accept', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['partner', 'admin']), orderController_1.partnerAcceptOrder);
 router.put('/:orderId/payment-method', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['customer']), orderController_1.updatePaymentMethod);
-router.put('/:id/status', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['driver', 'admin']), orderController_1.updateOrderStatus);
+router.put('/:id/status', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['driver', 'admin', 'partner']), orderController_1.updateOrderStatus);
 router.put('/:orderId/cancel', authMiddleware_1.auth, orderController_1.cancelOrder);
 router.put('/:id/rate', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['customer', 'admin']), orderController_1.rateOrder);
 router.post('/:id/message', authMiddleware_1.auth, orderController_1.sendOrderMessage);

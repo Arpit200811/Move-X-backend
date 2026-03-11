@@ -28,8 +28,18 @@ let Partner = class Partner {
     orders;
     autoAccept;
     isAcceptingOrders;
+    operatingHours; // { monday: { open: "09:00", close: "22:00" }, ... }
+    defaultPrepTime; // in minutes
+    industrySpecificData; // { prescriptionRequired, theaterLayout, etc }
     createdAt;
     owner;
+    address;
+    gstNumber;
+    gstRate;
+    surgeRules;
+    boostTier;
+    boostMultiplier;
+    boostExpiresAt;
     products;
 };
 exports.Partner = Partner;
@@ -90,6 +100,18 @@ __decorate([
     __metadata("design:type", Boolean)
 ], Partner.prototype, "isAcceptingOrders", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'simple-json', nullable: true }),
+    __metadata("design:type", Object)
+], Partner.prototype, "operatingHours", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'int', default: 15 }),
+    __metadata("design:type", Number)
+], Partner.prototype, "defaultPrepTime", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'simple-json', nullable: true }),
+    __metadata("design:type", Object)
+], Partner.prototype, "industrySpecificData", void 0);
+__decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
 ], Partner.prototype, "createdAt", void 0);
@@ -98,6 +120,34 @@ __decorate([
     (0, typeorm_1.JoinColumn)({ name: 'ownerId' }),
     __metadata("design:type", User_1.User)
 ], Partner.prototype, "owner", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Partner.prototype, "address", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Partner.prototype, "gstNumber", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'float', default: 5.0 }),
+    __metadata("design:type", Number)
+], Partner.prototype, "gstRate", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'simple-json', nullable: true }),
+    __metadata("design:type", Object)
+], Partner.prototype, "surgeRules", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Partner.prototype, "boostTier", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'float', nullable: true }),
+    __metadata("design:type", Number)
+], Partner.prototype, "boostMultiplier", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamp', nullable: true }),
+    __metadata("design:type", Date)
+], Partner.prototype, "boostExpiresAt", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => Product_1.Product, product => product.vendor),
     __metadata("design:type", Array)

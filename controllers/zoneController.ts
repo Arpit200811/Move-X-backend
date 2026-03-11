@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../data-source';
 import { Zone } from '../models/Zone';
 import { TaxConfig } from '../models/TaxConfig';
+import { GeoFencingService } from '../services/geoFencingService';
 
 export const getZones = async (req: Request, res: Response) => {
     try {
@@ -58,6 +59,37 @@ export const updateTaxConfig = async (req: Request, res: Response) => {
             await repo.save(config);
         }
         res.status(200).json({ success: true, config });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const checkServiceability = async (req: Request, res: Response) => {
+    try {
+        const { lat, lng } = req.query;
+        console.log(`🔍 [SERVICE CHECK] Lat: ${lat}, Lng: ${lng}`);
+        if (!lat || !lng) {
+            return res.status(400).json({ success: false, message: 'Latitude and Longitude are required' });
+        }
+
+        const zone = await GeoFencingService.getZoneAtLocation(Number(lat), Number(lng));
+        
+        if (!zone) {
+            return res.status(200).json({ 
+                success: false, 
+                message: 'Neural link established: We do not serve this sector yet.',
+                isServiceable: false 
+            });
+        }
+
+        return res.status(200).json({ 
+            success: true, 
+            isServiceable: true,
+            zone: {
+                name: zone.name,
+                id: zone._id
+            }
+        });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message });
     }

@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.partnerApply = exports.savePushToken = exports.toggleOnlineStatus = exports.updateSettings = exports.updateProfile = exports.sendOtp = exports.verifyOtp = exports.getAllUsers = exports.getMe = exports.registerUser = exports.approveDriver = exports.driverApply = exports.loginOrSignup = void 0;
+exports.createUserAdmin = exports.partnerApply = exports.savePushToken = exports.toggleOnlineStatus = exports.updateSettings = exports.updateProfile = exports.sendOtp = exports.verifyOtp = exports.getAllUsers = exports.getMe = exports.registerUser = exports.approveDriver = exports.driverApply = exports.updateUserStatus = exports.loginOrSignup = void 0;
 const data_source_1 = require("../data-source");
 const User_1 = require("../models/User");
 const Partner_1 = require("../models/Partner");
@@ -94,8 +94,11 @@ const loginOrSignup = async (req, res) => {
         }
         // PARTNER: Must exist and have correct role
         else if (role === 'partner') {
-            if (!user || user.role !== 'partner') {
-                return res.status(401).json({ success: false, message: 'Merchant account not found. Ensure registration is complete.' });
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'Merchant account not found. Please register your business first.' });
+            }
+            if (user.role !== 'partner') {
+                return res.status(403).json({ success: false, message: `Access Denied: This account is registered as a ${user.role}, not a merchant.` });
             }
             if (user.passwordHash && password) {
                 const valid = await bcryptjs_1.default.compare(password, user.passwordHash);
@@ -135,16 +138,56 @@ const loginOrSignup = async (req, res) => {
     }
 };
 exports.loginOrSignup = loginOrSignup;
+const updateUserStatus = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { status, role } = req.body;
+        const userRepository = data_source_1.AppDataSource.getRepository(User_1.User);
+        const user = await userRepository.findOne({ where: { _id: userId } });
+        if (!user)
+            return res.status(404).json({ success: false, message: 'User not found' });
+        if (status)
+            user.status = status;
+        if (role)
+            user.role = role;
+        await userRepository.save(user);
+        res.status(200).json({ success: true, user });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.updateUserStatus = updateUserStatus;
 const driverApply = async (req, res) => {
     try {
         const userRepository = data_source_1.AppDataSource.getRepository(User_1.User);
         const { phone, name, vehicle, licenseNumber, kycLicenseUrl, kycIdUrl } = req.body;
+        console.log(`[DRIVE-APPLY] Received application for ${phone}`, { name, vehicle });
+        if (!phone || !name || !vehicle) {
+            return res.status(400).json({ success: false, message: 'Missing mandatory fields: phone, name, and vehicle are required.' });
+        }
         let user = await userRepository.findOne({ where: { phone } });
         if (user) {
-            if (user.role === 'driver' || user.role === 'partner') {
-                return res.status(400).json({ success: false, message: 'This phone number is already registered.' });
+            if (user.role === 'driver') {
+                if (user.status === 'pending') {
+                    // UPDATE pending application instead of blocking
+                    user.name = name || user.name;
+                    user.vehicle = vehicle;
+                    user.licenseNumber = licenseNumber || '';
+                    user.kycLicenseUrl = kycLicenseUrl || null;
+                    user.kycIdUrl = kycIdUrl || null;
+                    await userRepository.save(user);
+                    return res.status(200).json({ success: true, message: 'Application details updated! Still awaiting approval.' });
+                }
+                if (user.status === 'rejected') {
+                    return res.status(400).json({ success: false, message: 'Your previous application was rejected. Please contact support to re-apply.' });
+                }
+                return res.status(400).json({ success: false, message: 'This phone number is already registered as a driver. Try logging in instead.' });
             }
-            // If customer, upgrade them to driver application
+            if (user.role === 'partner') {
+                return res.status(400).json({ success: false, message: 'This phone number is registered to a partner account. Business accounts cannot be drivers currently.' });
+            }
+            // Upgrade existing customer to driver applicant
             user.name = name || user.name;
             user.role = 'driver';
             user.vehicle = vehicle;
@@ -171,6 +214,7 @@ const driverApply = async (req, res) => {
         res.status(201).json({ success: true, message: 'Application submitted! Awaiting admin approval.' });
     }
     catch (error) {
+        console.error('[DRIVE-APPLY ERROR]', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -256,27 +300,28 @@ const getAllUsers = async (req, res) => {
 exports.getAllUsers = getAllUsers;
 const verifyOtp = async (req, res) => {
     try {
-        // Note: OTP logic might need 'otpCode' column in User.ts if missing.
-        // I'll assume it exists or add it.
         const userRepository = data_source_1.AppDataSource.getRepository(User_1.User);
         const { phone, otp } = req.body;
         const user = await userRepository.findOne({ where: { phone } });
-        if (!user?.otpCode) {
-            const devMode = process.env.NODE_ENV !== 'production';
-            if (devMode && otp === '1234') {
-                const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
-                return res.status(200).json({ success: true, message: 'OTP Verified (dev mode)', token, user });
-            }
-            return res.status(400).json({ success: false, message: 'OTP expired or not found. Request a new one.' });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found. Please try logging in again.' });
         }
-        if (user.otpCode !== otp) {
-            return res.status(400).json({ success: false, message: 'Invalid OTP. Please check and try again.' });
+        // --- BYPASS LOGIC ---
+        // User requested any 4-digit OTP to work.
+        const isBypass = otp && otp.length === 4;
+        if (isBypass || (user.otpCode && user.otpCode === otp)) {
+            user.otpCode = null;
+            user.phoneVerified = true;
+            await userRepository.save(user);
+            const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
+            return res.status(200).json({
+                success: true,
+                message: isBypass ? 'OTP Verified (Master Bypass)' : 'OTP Verified Successfully',
+                token,
+                user
+            });
         }
-        user.otpCode = null;
-        user.phoneVerified = true;
-        await userRepository.save(user);
-        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
-        res.status(200).json({ success: true, message: 'OTP Verified Successfully', token, user });
+        return res.status(400).json({ success: false, message: 'Invalid OTP. Please enter a 4-digit code.' });
     }
     catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -412,4 +457,30 @@ const partnerApply = async (req, res) => {
     }
 };
 exports.partnerApply = partnerApply;
+const createUserAdmin = async (req, res) => {
+    try {
+        const { phone, name, role, password } = req.body;
+        const userRepository = data_source_1.AppDataSource.getRepository(User_1.User);
+        const existing = await userRepository.findOne({ where: { phone } });
+        if (existing)
+            return res.status(400).json({ success: false, message: 'Node already registered.' });
+        const passwordHash = password ? await bcryptjs_1.default.hash(password, 10) : undefined;
+        const user = userRepository.create({
+            phone,
+            name,
+            role: role || 'customer',
+            passwordHash,
+            status: (role === 'admin' || role === 'partner') ? 'active' : 'online',
+            isOnline: false,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${phone}`,
+            phoneVerified: true
+        });
+        await userRepository.save(user);
+        res.status(201).json({ success: true, user });
+    }
+    catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+exports.createUserAdmin = createUserAdmin;
 //# sourceMappingURL=authController.js.map

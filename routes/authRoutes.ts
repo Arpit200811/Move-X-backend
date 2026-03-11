@@ -19,15 +19,17 @@ import {
 import { updateLocation, updateLocationBatch } from '../controllers/driverController';
 import { auth, roleGuard } from '../config/authMiddleware';
 import { upload } from '../config/multer';
+import { validateRequest } from '../middleware/validateRequest';
+import { loginSchema, sendOtpSchema, verifyOtpSchema, driverApplySchema, partnerApplySchema, createUserSchema } from '../validators/auth.validators';
 
 const router = express.Router();
 
-router.post('/login', loginOrSignup);
-router.post('/send-otp', sendOtp);
-router.post('/verify-otp', verifyOtp);
+router.post('/login', validateRequest(loginSchema), loginOrSignup);
+router.post('/send-otp', validateRequest(sendOtpSchema), sendOtp);
+router.post('/verify-otp', validateRequest(verifyOtpSchema), verifyOtp);
 router.post('/register', auth as any, roleGuard(['admin', 'customer']), registerUser);
-router.post('/driver-apply', driverApply);
-router.post('/partner-apply', partnerApply);
+router.post('/driver-apply', validateRequest(driverApplySchema), driverApply);
+router.post('/partner-apply', validateRequest(partnerApplySchema), partnerApply);
 router.patch('/drivers/:driverId/approve', auth as any, roleGuard(['admin']), approveDriver);
 router.get('/me', auth as any, getMe);
 router.get('/users', auth as any, roleGuard(['admin']), getAllUsers);
@@ -43,6 +45,6 @@ router.post('/toggle-online', auth as any, roleGuard(['driver']), toggleOnlineSt
 router.post('/location', auth as any, roleGuard(['driver']), updateLocation);
 router.post('/location-batch', auth as any, roleGuard(['driver']), updateLocationBatch);
 router.post('/push-token', auth as any, savePushToken);
-router.post('/provision-user', auth as any, roleGuard(['admin']), createUserAdmin);
+router.post('/provision-user', auth as any, roleGuard(['admin']), validateRequest(createUserSchema), createUserAdmin);
 
 export default router;

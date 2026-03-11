@@ -40,6 +40,7 @@ let User = class User {
     otpCode;
     phoneVerified;
     payoutDetails;
+    staffPartnerId;
     currency;
     createdAt;
 };
@@ -156,6 +157,10 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'simple-json', nullable: true }),
     __metadata("design:type", Object)
 ], User.prototype, "payoutDetails", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], User.prototype, "staffPartnerId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ default: 'INR' }),
     __metadata("design:type", String)

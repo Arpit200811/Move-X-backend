@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSystemLogs = exports.getSystemStats = exports.getMaintenanceMode = exports.toggleMaintenance = exports.getSystemStatus = void 0;
+exports.updateSystemConfig = exports.getSupportTickets = exports.getSystemLogs = exports.getSystemStats = exports.getMaintenanceMode = exports.toggleMaintenance = exports.getSystemStatus = void 0;
 const systemState = {
     maintenanceMode: false,
     nodes: [
@@ -55,4 +55,27 @@ const getSystemLogs = async (req, res) => {
     res.json({ success: true, logs });
 };
 exports.getSystemLogs = getSystemLogs;
+const getSupportTickets = async (req, res) => {
+    // Mocking support tickets for now
+    const tickets = [
+        { id: 'TIC-1024', user: 'Amit Sharma', subject: 'Refund for missing item', status: 'OPEN', priority: 'HIGH', date: new Date().toISOString() },
+        { id: 'TIC-1025', user: 'Rahul V.', subject: 'Driver took wrong route', status: 'CLOSED', priority: 'LOW', date: new Date(Date.now() - 3600000).toISOString() },
+        { id: 'TIC-1026', user: 'Nisha K.', subject: 'App crashing on checkout', status: 'IN_PROGRESS', priority: 'MEDIUM', date: new Date(Date.now() - 7200000).toISOString() },
+        { id: 'TIC-1027', user: 'Priya R.', subject: 'Coupon not applying', status: 'OPEN', priority: 'MEDIUM', date: new Date(Date.now() - 86400000).toISOString() }
+    ];
+    res.json({ success: true, tickets });
+};
+exports.getSupportTickets = getSupportTickets;
+const updateSystemConfig = async (req, res) => {
+    if (req.user?.role !== 'admin')
+        return res.status(403).json({ success: false, message: 'Admin access required' });
+    const { maintenanceMode, commissionRate, serviceRadius } = req.body;
+    if (maintenanceMode !== undefined) {
+        systemState.maintenanceMode = maintenanceMode;
+        req.io.emit('maintenance_status', { enabled: systemState.maintenanceMode });
+    }
+    // In real app, these would be saved to DB or systemState
+    res.json({ success: true, message: 'System configuration updated successfully' });
+};
+exports.updateSystemConfig = updateSystemConfig;
 //# sourceMappingURL=systemController.js.map

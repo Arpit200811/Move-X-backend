@@ -9,6 +9,7 @@ router.get('/', authMiddleware_1.auth, vendorController_1.getVendors);
 // Partner product management
 router.get('/my-products', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['partner', 'admin']), vendorController_1.getMyProducts);
 router.post('/products', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['partner', 'admin']), vendorController_1.addProduct);
+router.put('/products/:productId', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['partner', 'admin']), vendorController_1.updateProduct);
 router.delete('/products/:productId', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['partner', 'admin']), vendorController_1.deleteProduct);
 exports.default = router;
 //# sourceMappingURL=vendorRoutes.js.map

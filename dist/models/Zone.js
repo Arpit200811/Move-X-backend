@@ -16,7 +16,7 @@ let Zone = class Zone {
     name;
     boundary; // GeoJSON Polygon
     isActive;
-    baseMultipler; // For premium zones like Airports
+    baseMultiplier; // For premium zones like Airports
     description;
     createdAt;
     updatedAt;
@@ -41,7 +41,7 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ type: 'float', default: 1.0 }),
     __metadata("design:type", Number)
-], Zone.prototype, "baseMultipler", void 0);
+], Zone.prototype, "baseMultiplier", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)

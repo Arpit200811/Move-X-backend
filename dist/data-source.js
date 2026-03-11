@@ -50,6 +50,8 @@ const GroupOrder_1 = require("./models/GroupOrder");
 const Product_1 = require("./models/Product");
 const Zone_1 = require("./models/Zone");
 const Coupon_1 = require("./models/Coupon");
+const Banner_1 = require("./models/Banner");
+const VehicleType_1 = require("./models/VehicleType");
 const dotenv = __importStar(require("dotenv"));
 dotenv.config();
 const isProd = process.env.NODE_ENV === "production" || process.env.DATABASE_URL;
@@ -59,7 +61,7 @@ exports.AppDataSource = new typeorm_1.DataSource({
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     synchronize: true, // Set to false in production and use migrations
     logging: false,
-    entities: [User_1.User, Order_1.Order, Payment_1.Payment, Partner_1.Partner, Notification_1.Notification, Translation_1.Translation, Transaction_1.Transaction, AuditLog_1.AuditLog, Refund_1.Refund, TaxConfig_1.TaxConfig, GroupOrder_1.GroupOrder, Product_1.Product, Zone_1.Zone, Coupon_1.Coupon],
+    entities: [User_1.User, Order_1.Order, Payment_1.Payment, Partner_1.Partner, Notification_1.Notification, Translation_1.Translation, Transaction_1.Transaction, AuditLog_1.AuditLog, Refund_1.Refund, TaxConfig_1.TaxConfig, GroupOrder_1.GroupOrder, Product_1.Product, Zone_1.Zone, Coupon_1.Coupon, Banner_1.Banner, VehicleType_1.VehicleType],
     subscribers: [],
     migrations: [],
 });

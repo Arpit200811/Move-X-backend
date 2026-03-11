@@ -9,7 +9,7 @@ async function seed() {
     const globalZone = zoneRepo.create({
         name: 'Master Service Area',
         isActive: true,
-        baseMultipler: 1.0,
+        baseMultiplier: 1.0,
         description: 'Primary operational footprint covering major sectors.',
         boundary: {
             type: 'Polygon',

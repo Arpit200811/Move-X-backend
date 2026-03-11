@@ -10,6 +10,8 @@ const router = express_1.default.Router();
 router.get('/status', authMiddleware_1.auth, systemController_1.getSystemStatus);
 router.get('/stats', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['admin']), systemController_1.getSystemStats);
 router.get('/logs', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['admin']), systemController_1.getSystemLogs);
+router.get('/support-tickets', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['admin']), systemController_1.getSupportTickets);
 router.post('/toggle-maintenance', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['admin']), systemController_1.toggleMaintenance);
+router.put('/config', authMiddleware_1.auth, (0, authMiddleware_1.roleGuard)(['admin']), systemController_1.updateSystemConfig);
 exports.default = router;
 //# sourceMappingURL=systemRoutes.js.map

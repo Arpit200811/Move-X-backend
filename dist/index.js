@@ -65,6 +65,15 @@ const uploadRoutes_1 = __importDefault(require("./routes/uploadRoutes"));
 const groupOrderRoutes_1 = __importDefault(require("./routes/groupOrderRoutes"));
 const vendorRoutes_1 = __importDefault(require("./routes/vendorRoutes"));
 const marketingRoutes_1 = __importDefault(require("./routes/marketingRoutes"));
+const ticketRoutes_1 = __importDefault(require("./routes/ticketRoutes"));
+const zoneRoutes_1 = __importDefault(require("./routes/zoneRoutes"));
+const auditRoutes_1 = __importDefault(require("./routes/auditRoutes"));
+const bannerRoutes_1 = __importDefault(require("./routes/bannerRoutes"));
+const refundRoutes_1 = __importDefault(require("./routes/refundRoutes"));
+const fleetRoutes_1 = __importDefault(require("./routes/fleetRoutes"));
+const catalogRoutes_1 = __importDefault(require("./routes/catalogRoutes"));
+const surgeRoutes_1 = __importDefault(require("./routes/surgeRoutes"));
+const advancedPartnerRoutes_1 = __importDefault(require("./routes/advancedPartnerRoutes"));
 // Service Imports
 const dispatcherService_1 = require("./services/dispatcherService");
 dotenv.config({ path: '.env' });
@@ -77,7 +86,20 @@ app.use((req, res, next) => {
 });
 // ── Core Middleware ──────────────────────────────────────────────────
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['*'];
-app.use((0, cors_1.default)({ origin: allowedOrigins }));
+app.use((0, cors_1.default)({
+    origin: (origin, callback) => {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.indexOf('*') !== -1) {
+            callback(null, true);
+        }
+        else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
 app.use(express_1.default.json());
 app.use((0, helmet_1.default)());
 app.use((0, compression_1.default)());
@@ -87,20 +109,21 @@ app.use('/uploads', express_1.default.static('uploads'));
 // Global API Limiter
 const limiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000,
-    max: 200,
+    max: 2000, // Increased for testing
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Rate limit exceeded. Try again later.' }
 });
-// Stricter Limiter for Auth Routes (Prevention of Brute Force)
+// Stricter Limiter for Auth Routes
 const authLimiter = (0, express_rate_limit_1.default)({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // 10 attempts
-    message: { success: false, message: 'Too many login attempts. Please try again after an hour.' }
+    windowMs: 15 * 60 * 1000,
+    max: 100, // Increased from 10 to 100 for testing
+    message: { success: false, message: 'Too many login attempts. Please try again after 15 minutes.' }
 });
 app.use('/api/', limiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/driver-apply', authLimiter);
+app.use('/api/auth/verify-otp', authLimiter);
 // ── HTTPS Enforcement (Production) ──────────────────────────────────
 if (process.env.NODE_ENV === 'production' && process.env.FORCE_HTTPS === 'true') {
     app.use((req, res, next) => {
@@ -160,6 +183,16 @@ app.use('/api/system', systemRoutes_1.default);
 app.use('/api/upload', uploadRoutes_1.default);
 app.use('/api/vendors', vendorRoutes_1.default);
 app.use('/api/marketing', marketingRoutes_1.default);
+app.use('/api/tickets', ticketRoutes_1.default);
+app.use('/api/zones', zoneRoutes_1.default);
+app.use('/api/audit', auditRoutes_1.default);
+app.use('/api/banners', bannerRoutes_1.default);
+app.use('/api/refunds', refundRoutes_1.default);
+app.use('/api/zones', zoneRoutes_1.default);
+app.use('/api/fleet', fleetRoutes_1.default);
+app.use('/api/catalog', catalogRoutes_1.default);
+app.use('/api/surge', surgeRoutes_1.default);
+app.use('/api/partner-hub', advancedPartnerRoutes_1.default);
 // ── Global Error Handler ─────────────────────────────────────────────
 app.use((err, req, res, next) => {
     console.error(`[ERROR] ${req.method} ${req.path}:`, err.message);
@@ -180,6 +213,16 @@ io.on('connection', (socket) => {
     socket.on('join_group_room', (groupId) => {
         socket.join(`group_${groupId}`);
         console.log(`Socket ${socket.id} joined group room: group_${groupId}`);
+    });
+    socket.on('send_message', (data) => {
+        console.log(`Message from ${data.sender} in room ${data.orderId}: ${data.text}`);
+        // Broadcast to everyone in the room except the sender
+        socket.to(data.orderId).emit('new_message', {
+            id: (0, uuid_1.v4)(),
+            text: data.text,
+            sender: 'other',
+            timestamp: new Date().toISOString()
+        });
     });
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);

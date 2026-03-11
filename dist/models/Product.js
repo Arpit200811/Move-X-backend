@@ -20,6 +20,8 @@ let Product = class Product {
     category; // 'Pizza', 'Burger', 'Vitamins', 'Ayurveda', etc
     description;
     isAvailable;
+    outOfStockForToday;
+    customizationOptions; // { sizes: [], addOns: [{ name: "Extra Cheese", price: 20 }] }
     tags;
     vendor;
     createdAt;
@@ -53,6 +55,14 @@ __decorate([
     (0, typeorm_1.Column)({ default: true }),
     __metadata("design:type", Boolean)
 ], Product.prototype, "isAvailable", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ default: false }),
+    __metadata("design:type", Boolean)
+], Product.prototype, "outOfStockForToday", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'simple-json', nullable: true }),
+    __metadata("design:type", Object)
+], Product.prototype, "customizationOptions", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'simple-array', nullable: true }),
     __metadata("design:type", Array)

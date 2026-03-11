@@ -93,7 +93,7 @@ export const getTicketsData = async (
             duration: "12h 30m",
             operator: "IntrCity SmartBus",
             rating: "4.6",
-            price: "₹1,299",
+            price: `₹${1200 + Math.floor(Math.random() * 300)}`,
             type: "A/C Sleeper (2+1)",
             amenities: ["Wifi", "Water", "Blanket"],
           },
@@ -106,7 +106,7 @@ export const getTicketsData = async (
             duration: "12h 30m",
             operator: "Zingbus Premium",
             rating: "4.5",
-            price: "₹1,450",
+            price: `₹${1400 + Math.floor(Math.random() * 400)}`,
             type: "Volvo Multi-Axle A/C",
             amenities: ["Wifi", "Snacks", "Charging"],
           },
@@ -119,7 +119,7 @@ export const getTicketsData = async (
             duration: "8h 00m",
             operator: "SRS Travels",
             rating: "4.2",
-            price: "₹950",
+            price: `₹${900 + Math.floor(Math.random() * 200)}`,
             type: "Non A/C Sleeper",
             amenities: ["Blanket", "Reading Light"],
           },
@@ -168,5 +168,58 @@ export const getTicketsData = async (
         message: "Server error fetching tickets",
         error: error.message,
       });
+  }
+};
+
+export const searchBuses = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { from, to, date } = req.query;
+
+    if (!from || !to) {
+      res.status(400).json({ success: false, message: "Origin and Destination required" });
+      return;
+    }
+
+    // Mock dynamic fare logic based on city names length (to simulate distance variations)
+    const baseFare = 800;
+    const distanceFactor = ((from as string).length + (to as string).length) * 25;
+    const dynamicPrice = baseFare + distanceFactor + Math.floor(Math.random() * 200);
+
+    const routes = [
+      {
+        id: `search-${Date.now()}-1`,
+        from: from as string,
+        to: to as string,
+        departure: "21:30",
+        arrival: "07:45",
+        duration: "10h 15m",
+        operator: "MoveX Premium Express",
+        rating: "4.9",
+        price: `₹${dynamicPrice}`,
+        type: "Volvo Multi-Axle A/C Sleeper",
+        amenities: ["Wifi", "Charging", "Water", "Snacks"],
+      },
+      {
+        id: `search-${Date.now()}-2`,
+        from: from as string,
+        to: to as string,
+        departure: "22:45",
+        arrival: "09:15",
+        duration: "10h 30m",
+        operator: "Intercity SmartBus",
+        rating: "4.4",
+        price: `₹${dynamicPrice - 150}`,
+        type: "A/C Sleeper (2+1)",
+        amenities: ["Wifi", "Water", "Blanket"],
+      },
+    ];
+
+    res.status(200).json({ success: true, routes });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Neural routing error",
+      error: error.message,
+    });
   }
 };

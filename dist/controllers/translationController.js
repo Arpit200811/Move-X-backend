@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.seedTranslations = exports.getTranslations = void 0;
+exports.getLanguages = exports.updateTranslation = exports.seedTranslations = exports.getTranslations = void 0;
 const data_source_1 = require("../data-source");
 const Translation_1 = require("../models/Translation");
 const translationService_1 = require("../services/translationService");
@@ -157,6 +157,15 @@ const ENGLISH_DICTIONARY = {
     auth_otp: "Authorization OTP", confirm_release: "Confirm Release", aquire_payload: "Aquire Payload",
     secure_link_active: "Secure Link Active", no_packets_found: "No encrypted packets found.",
     type_message: "Type a message...",
+    // Auth & Errors
+    account_not_exists: "Account authorization failed. Node reference not found.",
+    email_required: "Communication address required.",
+    password_required: "Secure key required.",
+    invalid_email: "Malformed communication address protocol.",
+    login_success: "Authentication successful. Synchronizing session...",
+    resync_required: "Session expired. Resync required.",
+    unauthorized_node: "You are not authorized to access this secure node.",
+    access_denied: "ACCESS_DENIED: Critical permission missing.",
     solutions: "Solutions", company: "Company", safety: "Safety", developers: "Developers",
     sign_in: "Sign In", live_demo: "Live Demo", v2_core_active: "V2.0 Core Infrastructure Active",
     hero_title: "Logistics at Light Speed.", hero_desc: "Building the world's most advanced delivery network. MoveX leverages AI-driven dispatch and real-time telemetry to power global commerce.",
@@ -327,4 +336,34 @@ const seedTranslations = async (req, res) => {
     }
 };
 exports.seedTranslations = seedTranslations;
+const updateTranslation = async (req, res) => {
+    try {
+        const { lang, key, value } = req.body;
+        const repo = data_source_1.AppDataSource.getRepository(Translation_1.Translation);
+        let entry = await repo.findOne({ where: { lang, key } });
+        if (entry) {
+            entry.value = value;
+        }
+        else {
+            entry = repo.create({ lang, key, value });
+        }
+        await repo.save(entry);
+        res.status(200).json({ success: true, entry });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.updateTranslation = updateTranslation;
+const getLanguages = async (req, res) => {
+    try {
+        const repo = data_source_1.AppDataSource.getRepository(Translation_1.Translation);
+        const langs = await repo.createQueryBuilder('translation').select('DISTINCT lang').getRawMany();
+        res.status(200).json({ success: true, languages: langs.map(l => l.lang) });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.getLanguages = getLanguages;
 //# sourceMappingURL=translationController.js.map

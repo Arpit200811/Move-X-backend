@@ -38,13 +38,21 @@ export const calculateSurgeMultiplier = async (pickupLat: any, pickupLng: any): 
         const H3_RESOLUTION = 7; 
         const targetHex = h3.latLngToCell(Number(pickupLat), Number(pickupLng), H3_RESOLUTION);
 
-        const pendingOrders = await orderRepository.find({ where: { status: 'PENDING' } });
-        const availableDrivers = await userRepository.find({ where: { role: 'driver', isOnline: true, status: 'available' } });
+        const pendingOrders = await orderRepository.find({ 
+            where: { status: 'PENDING' },
+            select: ['pickupCoords']
+        });
+        
+        const availableDrivers = await userRepository.find({ 
+            where: { role: 'driver', isOnline: true, status: 'available' },
+            select: ['lat', 'lng']
+        });
 
         let localDemand = 0;
         for (const o of pendingOrders) {
-             if (o.pickupCoords && (o.pickupCoords as any).lat && (o.pickupCoords as any).lng) {
-                 const orderHex = h3.latLngToCell(Number((o.pickupCoords as any).lat), Number((o.pickupCoords as any).lng), H3_RESOLUTION);
+             const coords = o.pickupCoords as any;
+             if (coords && coords.lat && coords.lng) {
+                 const orderHex = h3.latLngToCell(Number(coords.lat), Number(coords.lng), H3_RESOLUTION);
                  if (orderHex === targetHex) localDemand++;
              }
         }
