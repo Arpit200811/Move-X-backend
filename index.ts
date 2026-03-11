@@ -143,76 +143,63 @@ app.get('/', (req: Request, res: Response) => {
 app.get('/api/seed-now', async (req: Request, res: Response) => {
   try {
     const bcrypt = require('bcryptjs');
-    const userRepo = AppDataSource.getRepository(require('./models/User').User);
-    const partnerRepo = AppDataSource.getRepository(require('./models/Partner').Partner);
+    const { User } = require('./models/User');
+    const { Partner } = require('./models/Partner');
+    const userRepo = AppDataSource.getRepository(User);
+    const partnerRepo = AppDataSource.getRepository(Partner);
+    
     const results: string[] = [];
 
-    // 1. Create / Update Admin
+    // 1. FORCE CLEAN & CREATE ADMIN
     const adminPhone = '9999999999';
-    let admin = await userRepo.findOne({ where: { phone: adminPhone } });
-    if (!admin) {
-      admin = userRepo.create({
-        phone: adminPhone,
-        name: 'System Admin',
-        role: 'admin',
-        passwordHash: await bcrypt.hash('demo123', 10),
-        status: 'active',
-        isOnline: true,
-        phoneVerified: true,
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
-      });
-      await userRepo.save(admin);
-      results.push('✅ Admin created: 9999999999 / demo123');
-    } else {
-      admin.passwordHash = await bcrypt.hash('demo123', 10);
-      admin.role = 'admin';
-      admin.status = 'active';
-      await userRepo.save(admin);
-      results.push('✅ Admin updated: 9999999999 / demo123');
-    }
+    // Delete any existing (just in case there's a corruption)
+    await userRepo.delete({ phone: adminPhone });
+    
+    const admin = userRepo.create({
+      phone: adminPhone,
+      name: 'System Admin',
+      role: 'admin',
+      passwordHash: await bcrypt.hash('demo123', 10),
+      status: 'active',
+      isOnline: true,
+      phoneVerified: true,
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
+    });
+    await userRepo.save(admin);
+    results.push('🚀 SUPER SEED: Admin FORCE CREATED: 9999999999 / demo123');
 
-    // 2. Create / Update Partner
+    // 2. FORCE CLEAN & CREATE PARTNER
     const partnerPhone = '6386373577';
-    let partnerUser = await userRepo.findOne({ where: { phone: partnerPhone } });
-    if (!partnerUser) {
-      partnerUser = userRepo.create({
-        phone: partnerPhone,
-        name: 'Admin Partner',
-        role: 'partner',
-        passwordHash: await bcrypt.hash('partner123', 10),
-        status: 'active',
-        isOnline: true,
-        phoneVerified: true,
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Partner'
-      });
-      await userRepo.save(partnerUser);
-    } else {
-      partnerUser.passwordHash = await bcrypt.hash('partner123', 10);
-      partnerUser.role = 'partner';
-      partnerUser.status = 'active';
-      await userRepo.save(partnerUser);
-    }
+    await userRepo.delete({ phone: partnerPhone });
+    
+    const partnerUser = userRepo.create({
+      phone: partnerPhone,
+      name: 'Admin Partner',
+      role: 'partner',
+      passwordHash: await bcrypt.hash('partner123', 10),
+      status: 'active',
+      isOnline: true,
+      phoneVerified: true,
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Partner'
+    });
+    await userRepo.save(partnerUser);
 
-    // Check if partner profile exists
-    const existingPartner = await partnerRepo.findOne({ where: { owner: { _id: partnerUser._id } } });
-    if (!existingPartner) {
-      const partner = partnerRepo.create({
-        name: 'MoveX HQ Store',
-        category: 'Restaurant',
-        email: 'partner@movex.com',
-        status: 'Active',
-        owner: partnerUser,
-        autoAccept: true,
-        isAcceptingOrders: true,
-        image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'
-      });
-      await partnerRepo.save(partner);
-      results.push('✅ Partner created: 6386373577 / partner123');
-    } else {
-      results.push('✅ Partner updated: 6386373577 / partner123');
-    }
+    // Create partner profile
+    await partnerRepo.delete({ name: 'MoveX HQ Store' });
+    const partner = partnerRepo.create({
+      name: 'MoveX HQ Store',
+      category: 'Restaurant',
+      email: 'partner@movex.com',
+      status: 'Active',
+      owner: partnerUser,
+      autoAccept: true,
+      isAcceptingOrders: true,
+      image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'
+    });
+    await partnerRepo.save(partner);
+    results.push('🚀 SUPER SEED: Partner FORCE CREATED: 6386373577 / partner123');
 
-    res.json({ success: true, message: 'Seed completed!', results });
+    res.json({ success: true, message: 'Clean Seed Completed!', results });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
