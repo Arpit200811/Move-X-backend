@@ -205,6 +205,17 @@ app.get('/api/seed-now', async (req: Request, res: Response) => {
   }
 });
 
+app.get('/api/debug-pending', async (req: Request, res: Response) => {
+  try {
+    const { User } = require('./models/User');
+    const userRepo = AppDataSource.getRepository(User);
+    const pending = await userRepo.find({ where: { role: 'driver', status: 'pending' } });
+    res.json({ count: pending.length, users: pending });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── API Routes ────────────────────────────────────────────────────────
 app.use('/api/zones', zoneRoutes);
 app.use('/api/auth', authRoutes);
