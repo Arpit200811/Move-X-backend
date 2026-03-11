@@ -45,6 +45,7 @@ import { DispatcherService } from './services/dispatcherService';
 dotenv.config({ path: '.env' });
 
 const app: Express = express();
+app.set('trust proxy', 1);
 
 // ── Request ID Tracing ──────────────────────────────────────────────
 app.use((req: Request, res: Response, next: NextFunction) => {
