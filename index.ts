@@ -148,6 +148,85 @@ app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'MoveX API Server is running (TypeScript Edition)' });
 });
 
+// ── ONE-TIME SEED ENDPOINT (Run once to create admin/partner, then remove) ──
+app.get('/api/seed-now', async (req: Request, res: Response) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const userRepo = AppDataSource.getRepository(require('./models/User').User);
+    const partnerRepo = AppDataSource.getRepository(require('./models/Partner').Partner);
+    const results: string[] = [];
+
+    // 1. Create / Update Admin
+    const adminPhone = '9999999999';
+    let admin = await userRepo.findOne({ where: { phone: adminPhone } });
+    if (!admin) {
+      admin = userRepo.create({
+        phone: adminPhone,
+        name: 'System Admin',
+        role: 'admin',
+        passwordHash: await bcrypt.hash('demo123', 10),
+        status: 'active',
+        isOnline: true,
+        phoneVerified: true,
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
+      });
+      await userRepo.save(admin);
+      results.push('✅ Admin created: 9999999999 / demo123');
+    } else {
+      admin.passwordHash = await bcrypt.hash('demo123', 10);
+      admin.role = 'admin';
+      admin.status = 'active';
+      await userRepo.save(admin);
+      results.push('✅ Admin updated: 9999999999 / demo123');
+    }
+
+    // 2. Create / Update Partner
+    const partnerPhone = '6386373577';
+    let partnerUser = await userRepo.findOne({ where: { phone: partnerPhone } });
+    if (!partnerUser) {
+      partnerUser = userRepo.create({
+        phone: partnerPhone,
+        name: 'Admin Partner',
+        role: 'partner',
+        passwordHash: await bcrypt.hash('partner123', 10),
+        status: 'active',
+        isOnline: true,
+        phoneVerified: true,
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Partner'
+      });
+      await userRepo.save(partnerUser);
+    } else {
+      partnerUser.passwordHash = await bcrypt.hash('partner123', 10);
+      partnerUser.role = 'partner';
+      partnerUser.status = 'active';
+      await userRepo.save(partnerUser);
+    }
+
+    // Check if partner profile exists
+    const existingPartner = await partnerRepo.findOne({ where: { owner: { _id: partnerUser._id } } });
+    if (!existingPartner) {
+      const partner = partnerRepo.create({
+        name: 'MoveX HQ Store',
+        category: 'Restaurant',
+        email: 'partner@movex.com',
+        status: 'Active',
+        owner: partnerUser,
+        autoAccept: true,
+        isAcceptingOrders: true,
+        image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4'
+      });
+      await partnerRepo.save(partner);
+      results.push('✅ Partner created: 6386373577 / partner123');
+    } else {
+      results.push('✅ Partner updated: 6386373577 / partner123');
+    }
+
+    res.json({ success: true, message: 'Seed completed!', results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── API Routes ────────────────────────────────────────────────────────
 app.use('/api/zones', zoneRoutes);
 app.use('/api/auth', authRoutes);
