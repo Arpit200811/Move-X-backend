@@ -143,21 +143,28 @@ export const getTransactions = async (req: AuthenticatedRequest, res: Response) 
 
 export const requestPayout = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const { amount } = req.body;
+        const { amount, bankDetails } = req.body;
         const userRepository = AppDataSource.getRepository(User);
         const transactionRepository = AppDataSource.getRepository(Transaction);
         
         const user = await userRepository.findOne({ where: { _id: req.user?.id } });
         if (!user) return res.status(404).json({ success: false, message: 'User not found' });
         
-        // Operational Threshold Guard ($50)
+        // Operational Threshold Guard
         const MIN_THRESHOLD = 50;
-        if (amount < MIN_THRESHOLD) {
-            return res.status(400).json({ success: false, message: `Minimum Payout request is $${MIN_THRESHOLD}` });
+        const requestedAmount = Math.abs(parseFloat(amount));
+        
+        if (requestedAmount < MIN_THRESHOLD) {
+            return res.status(400).json({ success: false, message: `Minimum Payout request is ₹${MIN_THRESHOLD}` });
         }
 
-        if (!user.walletBalance || user.walletBalance < amount) {
+        if (!user.walletBalance || user.walletBalance < requestedAmount) {
             return res.status(400).json({ success: false, message: 'Insufficient funds in wallet.' });
+        }
+
+        // Save bank details for future if provided
+        if (bankDetails) {
+            user.payoutDetails = bankDetails;
         }
 
         if (!user.payoutDetails) {
@@ -165,20 +172,24 @@ export const requestPayout = async (req: AuthenticatedRequest, res: Response) =>
         }
 
         // Deduct balance
-        user.walletBalance -= amount;
+        user.walletBalance -= requestedAmount;
         await userRepository.save(user);
 
         // Create payout transaction
+        const payoutDesc = typeof user.payoutDetails === 'string' 
+            ? user.payoutDetails 
+            : (user.payoutDetails as any).accountNumber || (user.payoutDetails as any).upiId || 'Secure Node';
+
         const tx = transactionRepository.create({
             userId: user._id,
-            amount: -Math.abs(amount),
-            type: 'PAYOUT',
+            amount: -requestedAmount,
+            type: 'WITHDRAWAL',
             status: 'PENDING',
-            description: `Payout request for $${amount}`
+            description: `Payout request linked to ${payoutDesc.substring(0, 10)}...`
         });
         await transactionRepository.save(tx);
 
-        res.status(200).json({ success: true, message: 'Payout request initiated.', transaction: tx });
+        res.status(200).json({ success: true, message: 'Payout request initiated securely.', transaction: tx });
     } catch (err: any) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -195,7 +206,7 @@ export const exportAuditReport = async (req: AuthenticatedRequest, res: Response
             'Agent/Entity': t.user?.name || 'N/A',
             'Mission ID': t.order?.orderId || 'N/A',
             'Type': t.type,
-            'Amount ($)': t.amount.toFixed(2),
+            'Amount (₹)': t.amount.toFixed(2),
             'Status': t.status,
             'Context': t.description
         }));

@@ -3,6 +3,8 @@ import { AuthenticatedRequest } from '../config/authMiddleware';
 
 const systemState = {
     maintenanceMode: false,
+    minVersion: '1.1.0',
+    latestVersion: '1.2.0',
     nodes: [
         { id: 'Node-ALPHA', status: 'Active', load: 45, region: 'US-East' },
         { id: 'Node-BRAVO', status: 'Active', load: 32, region: 'EU-West' },

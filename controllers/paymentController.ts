@@ -3,6 +3,7 @@ import { AppDataSource } from '../data-source';
 import { Order } from '../models/Order';
 import { User } from '../models/User';
 import { Refund } from '../models/Refund';
+import { Transaction } from '../models/Transaction';
 import { AuthenticatedRequest } from '../config/authMiddleware';
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_51MockKey12345');
 
@@ -56,6 +57,16 @@ export const requestPayout = async (req: AuthenticatedRequest, res: Response) =>
 
     driver.walletBalance -= amount;
     await userRepository.save(driver);
+
+    // [AUDIT] Log Payout in Transaction Ledger
+    const txRepo = AppDataSource.getRepository(Transaction);
+    await txRepo.save(txRepo.create({
+        userId: driver._id,
+        type: 'WITHDRAWAL',
+        amount: -amount,
+        status: 'PENDING',
+        description: `Payout requested via ${req.body.method || 'Bank'}`
+    }));
 
     res.status(200).json({ success: true, message: 'Payout initiated securely.', newBalance: driver.walletBalance });
   } catch (error: any) {

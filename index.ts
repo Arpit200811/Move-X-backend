@@ -279,6 +279,14 @@ io.on('connection', (socket: any) => {
     });
   });
 
+  socket.on('typing', (data: { orderId: string, sender: string }) => {
+    socket.to(data.orderId).emit('user_typing', { sender: data.sender });
+  });
+
+  socket.on('stop_typing', (data: { orderId: string }) => {
+    socket.to(data.orderId).emit('user_stop_typing');
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });

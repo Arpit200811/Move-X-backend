@@ -58,6 +58,10 @@ export const NOTIFICATION_TEMPLATES: Record<string, { title: string; body: (d: a
   KYC_REJECTED: {
     title: '⚠️ Verification Failed',
     body: (d) => `Your documents were rejected. Reason: ${d.reason || 'Please resubmit clear images'}.`
+  },
+  NEAR_DESTINATION: {
+    title: '🛰️ Almost There!',
+    body: (d) => `Your agent ${d.agentName || 'Rider'} is just 500 meters away from the drop-off!`
   }
 };
 

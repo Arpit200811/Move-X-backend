@@ -338,6 +338,8 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
     if (name) user.name = name;
     if (avatar) user.avatar = avatar;
     if (vehicle) user.vehicle = vehicle;
+    if (req.body.kycLicenseUrl) user.kycLicenseUrl = req.body.kycLicenseUrl;
+    if (req.body.kycIdUrl) user.kycIdUrl = req.body.kycIdUrl;
     await userRepository.save(user);
     res.status(200).json({ success: true, user });
   } catch (error: any) {

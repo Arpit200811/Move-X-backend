@@ -17,7 +17,8 @@ import {
   updatePaymentMethod,
   getHistoricalHeatmap,
   gatePassCheck,
-  getPriceQuote
+  getPriceQuote,
+  raiseDispute
 } from '../controllers/orderController';
 import { auth, roleGuard } from '../config/authMiddleware';
 
@@ -42,5 +43,6 @@ router.put('/:id/status', auth as any, roleGuard(['driver', 'admin', 'partner'])
 router.put('/:orderId/cancel', auth as any, cancelOrder);
 router.put('/:id/rate', auth as any, roleGuard(['customer', 'admin']), rateOrder);
 router.post('/:id/message', auth as any, sendOrderMessage);
+router.post('/:id/dispute', auth as any, roleGuard(['customer']), raiseDispute);
 
 export default router;

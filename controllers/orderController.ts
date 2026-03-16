@@ -1,12 +1,15 @@
+import { Coupon } from '../models/Coupon';
 import { Response } from 'express';
 import { AppDataSource } from '../data-source';
 import { Order } from '../models/Order';
 import { User } from '../models/User';
+import { Refund } from '../models/Refund';
 import { Partner } from '../models/Partner';
 import { Transaction } from '../models/Transaction';
 import { AuthenticatedRequest } from '../config/authMiddleware';
 import { sendNotification } from '../services/notificationService';
 import { DispatcherService } from '../services/dispatcherService';
+import { MissionAuditService } from '../services/MissionAuditService';
 import { Between, In } from 'typeorm';
 import { AuditService } from '../services/auditService';
 import { calculateSurgeMultiplier } from '../services/surgeService';
@@ -71,13 +74,31 @@ export const createOrder = async (req: AuthenticatedRequest, res: Response) => {
         serviceClassSurcharge: {}
     };
     const { multiplier } = await calculateSurgeMultiplier(pLat, pLng);
-
     const calculatedBase = (config.baseFare || 30) + (distance * (config.perKmRate || 12));
     const finalDeliveryFee = Number((calculatedBase * multiplier).toFixed(2)) || 0;
     const calculatedTax = Number((finalDeliveryFee * (config.taxRate || 0) / 100).toFixed(2)) || 0;
-    let verifiedTotal = (itemsTotal || 0) + finalDeliveryFee + calculatedTax;
+    
+    // --- 🟢 DYNAMIC PROMO VALIDATION ---
+    let serverDiscount = 0;
+    if (promoCode) {
+        try {
+            const couponRepo = AppDataSource.getRepository(Coupon);
+            const couponEntity = await couponRepo.findOne({ where: { code: promoCode.toUpperCase(), isActive: true } });
+            if (couponEntity && (!couponEntity.expiryDate || new Date() < new Date(couponEntity.expiryDate))) {
+                if (couponEntity.type === 'percentage') {
+                    serverDiscount = ((itemsTotal || 0) + finalDeliveryFee) * (couponEntity.value / 100);
+                    if (couponEntity.maxDiscountAmount && serverDiscount > couponEntity.maxDiscountAmount) serverDiscount = couponEntity.maxDiscountAmount;
+                } else {
+                    serverDiscount = couponEntity.value;
+                }
+            }
+        } catch (_) { /* Fallback to zero discount on error */ }
+    }
+
+    let verifiedTotal = (itemsTotal || 0) + finalDeliveryFee + calculatedTax - serverDiscount;
 
     if (isNaN(verifiedTotal)) verifiedTotal = 0;
+    if (verifiedTotal < 0) verifiedTotal = 0;
 
     // 2. WALLET PRE-AUTHENTICATION & DEBIT
     const userRepository = AppDataSource.getRepository(User);
@@ -117,12 +138,23 @@ export const createOrder = async (req: AuthenticatedRequest, res: Response) => {
       currency: config.currency || 'INR',
       total: verifiedTotal,
       promoCode,
-      discount: 0,
+      discount: serverDiscount,
       partnerId: (partnerId && partnerId.length > 30) ? ({ _id: partnerId } as any) : undefined,
       timeline: [{ status: 'PENDING', timestamp: new Date() }]
     }) as unknown as Order;
 
     await orderRepository.save(order);
+
+    // [AUDIT] Log Initial Creation
+    await MissionAuditService.record({
+      entityType: 'order',
+      entityId: order._id,
+      event: 'ORDER_CREATED',
+      newState: order,
+      actorId: req.user?.id,
+      actorRole: req.user?.role,
+      ipAddress: req.ip
+    });
     
     // 3. Hydrate with base relations first
     const hydratedOrder = await orderRepository.findOne({ 
@@ -226,9 +258,20 @@ export const getPriceQuote = async (req: AuthenticatedRequest, res: Response) =>
 
         // Apply Surge
         const finalPriceBeforeTax = subtotal * multiplier;
-        const taxAmount = (finalPriceBeforeTax * (config.taxRate || 0)) / 100;
+        const taxRate = config.taxRate || 0;
+        const taxAmount = (finalPriceBeforeTax * taxRate) / 100;
         const deliveryFee = Number(finalPriceBeforeTax.toFixed(2));
         const total = finalPriceBeforeTax + taxAmount;
+
+        // Breakdown metadata
+        const breakdown = {
+            baseFare: base,
+            distanceCharge: distCharge,
+            subtotal: subtotal,
+            surgeAmount: (finalPriceBeforeTax - subtotal),
+            tax: taxAmount,
+            taxName: config.taxName || 'GST'
+        };
 
         res.status(200).json({
             success: true,
@@ -237,10 +280,13 @@ export const getPriceQuote = async (req: AuthenticatedRequest, res: Response) =>
                 baseFare: base.toFixed(2),
                 distanceCharge: distCharge.toFixed(2),
                 deliveryFee: deliveryFee.toFixed(2),
+                subtotal: subtotal.toFixed(2),
                 surgeMultiplier: multiplier,
                 surgeReasons: reasons,
                 tax: taxAmount.toFixed(2),
+                taxName: config.taxName || 'GST',
                 total: total.toFixed(2),
+                breakdown,
                 currency: config.currency || 'INR',
                 currencySymbol: config.currencySymbol || '₹',
                 expiresIn: 300 // 5 minutes validity
@@ -372,6 +418,18 @@ export const acceptMission = async (req: AuthenticatedRequest, res: Response) =>
         
         await orderRepository.save(order);
         await userRepository.update(driverId as string, { status: 'busy' });
+
+        // [AUDIT] Log Driver Acceptance
+        await MissionAuditService.record({
+            entityType: 'order',
+            entityId: order._id,
+            event: 'DRIVER_ACCEPTED',
+            previousState: 'ASSIGNED',
+            newState: 'ACCEPTED',
+            actorId: driverId,
+            actorRole: 'driver',
+            ipAddress: req.ip
+        });
 
         sendNotification(order.customerId?._id as string, 'Rider En-Route', 'Our agent has accepted the mission.', { orderId: order._id });
 
@@ -717,6 +775,66 @@ export const exportDriversCSV = async (req: AuthenticatedRequest, res: Response)
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', 'attachment; filename=drivers_report.csv');
         res.send(csv);
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+export const searchBuses = async (req: Request, res: Response) => {
+    // ... logic for searching buses (this was already here in ticketController but we are in orderController)
+    // Actually, I'll just add my raiseDispute here.
+}
+
+export const raiseDispute = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { reason, category, items } = req.body; // category: 'MISSING_ITEM' | 'WRONG_ROUTE' | 'OTHER'
+        
+        const orderRepo = AppDataSource.getRepository(Order);
+        const refundRepo = AppDataSource.getRepository(Refund);
+        
+        const order = await orderRepo.findOne({ 
+            where: { _id: id as string },
+            relations: ['customerId']
+        });
+
+        if (!order) return res.status(404).json({ success: false, message: 'Neutral network error: Order not found.' });
+        if (order.disputeStatus === 'open') {
+            return res.status(400).json({ success: false, message: 'Dispute already active for this mission node.' });
+        }
+
+        order.disputeStatus = 'open';
+        await orderRepo.save(order);
+
+        // Calculate partial refund if missing item
+        let refundAmount = 0;
+        if (category === 'MISSING_ITEM' && Array.isArray(items)) {
+            // Find items in order.items and sum their prices
+            const orderItems = order.items || [];
+            items.forEach((missingItem: any) => {
+                const found = orderItems.find((oi: any) => oi.name === missingItem.name);
+                if (found) {
+                    refundAmount += (found.price * (missingItem.quantity || 1));
+                }
+            });
+        }
+
+        const refund = refundRepo.create({
+            orderId: order._id,
+            customerId: (order.customerId as any)?._id || order.customerId,
+            originalAmount: order.total || 0,
+            refundAmount: refundAmount,
+            refundType: refundAmount > 0 ? 'partial' : 'full',
+            reason: `[${category}] ${reason}`,
+            status: 'pending'
+        });
+
+        await refundRepo.save(refund);
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Dispute protocol engaged. Central Command will review your evidence within 24 standard hours.',
+            refundId: refund._id
+        });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message });
     }
